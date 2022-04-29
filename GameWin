@@ -1,0 +1,204 @@
+package window;
+
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.util.*;
+
+import javax.swing.JFrame;
+
+import objects.BodyObj;
+import objects.FoodObj;
+import objects.HeadObj;
+import utils.GameUtils;
+
+public class GameWin extends JFrame{
+	
+	//分数
+	public int score = 0;
+	
+	//游戏状态  0：未开始 1：游戏中 2：暂停 3：失败 4：过关 5：失败后重启 6.下一关 
+	public static int state = 0; 
+	
+	//窗口所有元素每次都需要重新绘制到窗口导致画面闪动。
+	//为解决画面闪动问题，把所有小元素绘制到一个空图片上再一次性绘制到主窗口
+	//定义双缓存图片
+	Image offScreenImage = null;
+	
+	//窗口宽高
+	int winWidth = 800, winHeight = 600;
+	
+	//创建蛇头的对象
+	HeadObj headObj = new HeadObj(GameUtils.rightImg, 60, 570, this);
+	
+	//蛇身的集合
+	public List<BodyObj> bodyObjList = new ArrayList<>();
+	
+	//创建食物的对象
+	public FoodObj foodObj = new FoodObj().getFood();//getFood()的返回值是foodObbj的对象
+	
+	//设置窗口信息
+	public void launch() {
+		//设置窗口是否可见
+		this.setVisible(true);
+		//设置窗口的大小
+		this.setSize(winWidth, winHeight);
+		//设置窗口的位置在屏幕居中
+		this.setLocationRelativeTo(null);
+		//设置窗口的标题
+		this.setTitle("贪吃蛇");
+	
+		//对蛇身初始化，最开始有两节身体
+		bodyObjList.add(new BodyObj(GameUtils.bodyImg, 30,570,this));
+		bodyObjList.add(new BodyObj(GameUtils.bodyImg, 0,570,this));
+		
+		//添加键盘事件来更改游戏状态
+		this.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if(e.getKeyCode() == KeyEvent.VK_SPACE) {
+					switch(state) {
+					case 0:
+						//未开始，按空格后开始
+						state = 1;
+						break;
+					case 1:
+						//游戏中，按空格后暂停
+						state = 2;
+						repaint();
+						break;
+					case 2:
+						//暂停中，按空格后继续
+						state = 1;
+						break;
+					case 3:
+						//游戏失败，按空格键重启
+						state = 5;
+						break;
+					case 4:
+						//游戏通关，下一关
+						state = 6;
+						default:
+							break;
+					}
+				}
+			}
+			
+		});
+		
+		while(true) {
+			if(state == 1) { 
+				repaint();
+			}
+			if(state == 5) {
+				state = 0;
+				resetGame();
+			}
+			if(state == 6 && GameUtils.level != 3) {
+				state = 1;
+				GameUtils.level++;
+				resetGame();
+			}
+			try {
+				Thread.sleep(200 - GameUtils.level*50);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}//while
+	}//launch()
+	
+	//重写paint方法
+	@Override
+	public void paint(Graphics g) {
+		
+		//初始化双缓存图片
+		if(offScreenImage == null) {
+			offScreenImage = this.createImage(winWidth, winHeight);
+		}
+		//获取图片对应的graphics对象gImage
+		Graphics gImage = offScreenImage.getGraphics();
+		
+		//添加灰色背景
+		gImage.setColor(Color.gray);
+		gImage.fillRect(0, 0, winWidth, winHeight);
+		//绘制网格线
+		gImage.setColor(Color.black);
+		for (int i = 0; i <= 20; i++) {
+			gImage.drawLine(0, 30*i, 600, 30*i); //横线
+			gImage.drawLine(30*i, 0, 30*i, 600); //竖线
+		}
+		
+		//绘制蛇身
+		for(int i = bodyObjList.size()-1;i>=0;i--) {
+			bodyObjList.get(i).paintSelf(gImage);
+		}
+		
+		//绘制蛇头
+		headObj.paintSelf(gImage);
+		
+		//绘制食物
+		foodObj.paintSelf(gImage);
+		
+		//绘制关卡
+		GameUtils.drawWord(gImage, "第"+GameUtils.level+"关", Color.pink, 40, 650, 200);
+		
+		//绘制分数
+		GameUtils.drawWord(gImage, score+"分", Color.cyan, 60, 660, 350);	
+		
+		//调用绘制提示语方法
+		gImage.setColor(Color.gray);
+		promot(gImage);
+		
+		//将双缓存图片绘制到主窗口
+		g.drawImage(offScreenImage, 0, 0, null);
+	}
+	
+	//绘制提示语
+	void promot(Graphics g) {
+		//未开始
+		if(state == 0) {
+			g.fillRect(130, 250, 370, 70);
+			GameUtils.drawWord(g, "按下空格键开始游戏", Color.yellow, 35, 150, 300);
+		}
+		//暂停
+		if(state == 2) {
+			g.fillRect(130, 250, 400, 70);
+			GameUtils.drawWord(g, "游戏暂停，按空格键继续", Color.yellow, 32, 150, 300);
+		}
+		//失败
+		if(state == 3) {
+			g.fillRect(130, 250, 460, 70);
+			GameUtils.drawWord(g, "游戏失败，按空格键重新开始", Color.red, 32, 150, 300);
+		}
+		//过关
+		if(state == 4) {
+			if(GameUtils.level == 3) {
+				g.fillRect(130, 250, 370, 70);
+				GameUtils.drawWord(g, "恭喜！游戏全部通关", Color.green, 35, 150, 300);
+			}else {
+				g.fillRect(50, 250, 550, 70);
+				GameUtils.drawWord(g, "游戏过关，按空格键进入下一关", Color.green, 35, 70, 300);
+			}
+
+		}
+		
+	}
+	
+	//游戏失败后重置
+	void resetGame() {
+		//闭关当前窗口
+		this.dispose();
+		//开启一个新窗口
+		String[] args = null;
+		main(args);
+	}
+
+
+	public static void main(String[] args) {
+		GameWin gamewin = new GameWin();
+		gamewin.launch();
+	}
+}
+
